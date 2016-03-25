@@ -31,9 +31,31 @@ void switch_uart_19200()
 
 void start_robot_safe()
 {
-	uart_sendbyte(128);
-	uart_sendbyte(131);
+	uart_sendbyte(128);		//Send START command
+	uart_sendbyte(131);		//Switch to SAFE mode
 }
+
+void roomba_init();
+{
+	switch_uart_19200();
+	start_robot_safe();
+	
+	//Write a "song" for the beep into slot 0
+	//Example from: http://www.robotappstore.com/Knowledge-Base/4-How-to-Send-Commands-to-Roomba/18.html
+	uart_sendbyte(140);
+	uart_sendbyte(0);
+	uart_sendbyte(1);
+	uart_sendbyte(62);
+	uart_sendbyte(32);
+}
+
+void beep()
+{		
+	//Play the beep "song" created in roomba_init
+	uart_sendbyte(141);
+	uart_sendbyte(0);
+}
+
 
 void drive(int16_t vel, int16_t rad)
 {
@@ -54,31 +76,28 @@ void drive(int16_t vel, int16_t rad)
 	uart_sendbyte(vel);				//velocity low byte
 	uart_sendbyte(rad >> 8);		//Radius high byte
 	uart_sendbyte(rad);				//Radius low byte
-	
 }
 
-void beep()
-{		
-	/*Example from:
-	http://www.robotappstore.com/Knowledge-Base/4-How-to-Send-Commands-to-Roomba/18.html */
-		
-	//Write a "song" for the beep
-	uart_sendbyte(140);
-	uart_sendbyte(0);
-	uart_sendbyte(1);
-	uart_sendbyte(62);
-	uart_sendbyte(32);
+void query_sensors()
+{
+	uart_sendbyte(149);				//Opcode for Query List
+	uart_sendbyte(4);				//Query will send three sensors packets
+	uart_sendbyte(7);				//Packet 7: Bump/Wheeldrop detection
+	uart_sendbyte(8);				//Packet 8: Wall seen?
+	uart_sendbyte(27);				//Packet 27: Strength of wall signal
+	uart_sendbyte(13);				//Packet 13: Virtual wall seen?
+}
+
+void send_query_list()
+{
 	
-	//Play the beep "song"
-	uart_sendbyte(141);
-	uart_sendbyte(0);
+	
 }
 
 int main()
 {
 	uart_init();
-	switch_uart_19200();
-	start_robot_safe();
+	roomba_init();
 	
 	while(1)
 	{
