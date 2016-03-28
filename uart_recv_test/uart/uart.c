@@ -19,6 +19,9 @@ void uart0_init(void) {
 }
 
 void uart1_init(void) {
+	
+	PRR1 &= ~(1 << PRUSART1);
+	
 	UBRR1H = UBRRH_VALUE;
 	UBRR1L = UBRRL_VALUE;
 	

@@ -12,9 +12,9 @@
     <OutputFileName>$(MSBuildProjectName)</OutputFileName>
     <OutputFileExtension>.elf</OutputFileExtension>
     <OutputDirectory>$(MSBuildProjectDirectory)\$(Configuration)</OutputDirectory>
-    <AssemblyName>roomba_test</AssemblyName>
-    <Name>roomba_test</Name>
-    <RootNamespace>roomba_test</RootNamespace>
+    <AssemblyName>uart_recv_test</AssemblyName>
+    <Name>uart_recv_test</Name>
+    <RootNamespace>uart_recv_test</RootNamespace>
     <ToolchainFlavour>Native</ToolchainFlavour>
     <KeepTimersRunning>true</KeepTimersRunning>
     <OverrideVtor>false</OverrideVtor>
