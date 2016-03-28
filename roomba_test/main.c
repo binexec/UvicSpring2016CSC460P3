@@ -115,6 +115,18 @@ void send_query_list()
 		curbyte = uart1_recvbyte();		//Read a byte returned by the robot
 		uart0_sendbyte(curbyte);		//Forward the byte back to the base station via BT 
 	}
+	
+	/*
+		Currently, the data bytes for the following sensors will be returned in order:
+			1: Bump/Wheeldrop
+			2: Wall detection
+			3: Upper byte of wall strength
+			4: Lower byte of wall strength
+			5: Virtual wall detection 
+			
+		Note that after robot initialization, the robot will send 8 bytes of unneeded data back to the base station.
+		Be sure to ignore these 8 bytes.
+	*/
 }
 
 int main()
