@@ -2,13 +2,24 @@
 #include <avr/io.h>
 #include "uart/uart.h"
 
-#define SENSORS_TO_QUERY 2		//How many sensors are we querying from the robot?
+#define SENSORS_TO_QUERY 4		//How many sensors are we querying from the robot?
 #define TWO_BYTE_SENSORS 1		//How many of the sensors above returns 2 bytes of data instead of 1?
 
 //Special case values for radius, used for drive
 #define DRIVE_STRAIGHT			0x7FFF			//32767
 #define CLOCKWISE_TURN			0xFFFF			//-1
 #define COUNTER_CLOCKWISE_TURN	0x1				//1
+
+
+#define MAX_CMD_LENG 4
+
+//Command/OPcodes base station sends to remote
+#define MOVE_CMD ((const char *) "!MV\n")
+#define LASER_CMD ((const char *) "!TL\n")
+#define HIT_CMD ((const char *) "!HT\n")
+
+//Command/OPcodes remote station sends to base
+#define SENSOR_DATA ((const char *) "!SD\n")
 
 void switch_uart_19200()
 {
@@ -85,16 +96,19 @@ void query_sensors()
 {
 	uart1_sendbyte(149);				//Opcode for Query List
 	uart1_sendbyte(SENSORS_TO_QUERY);	//Query will send three sensors packets
-	//uart1_sendbyte(7);					//Packet 7: Bump/Wheeldrop detection
+	uart1_sendbyte(7);					//Packet 7: Bump/Wheeldrop detection
 	uart1_sendbyte(8);					//Packet 8: Wall seen?
 	uart1_sendbyte(27);					//Packet 27: Strength of wall signal (Two bytes)
-	//uart1_sendbyte(13);					//Packet 13: Virtual wall seen?
+	uart1_sendbyte(13);					//Packet 13: Virtual wall seen?
 }
 
 void send_query_list()
 {
 	uint8_t i;
 	uint8_t curbyte;
+	
+	//Sends preamble to base
+	uart0_sendstr(SENSOR_DATA);
 	
 	for(i=0; i<SENSORS_TO_QUERY + TWO_BYTE_SENSORS; i++)
 	{

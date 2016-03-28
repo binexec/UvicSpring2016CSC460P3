@@ -55,6 +55,23 @@ void uart0_sendstr(char* input)
 	}
 }
 
+//NEEDS TESTING
+int uart0_recvuntil(char* input, char end_char, uint8_t max_chars)
+{
+	int bytes_read = 0;
+	char cur;
+	
+	do
+	{
+		cur = uart0_recvbyte();
+		input[bytes_read] = cur;
+		bytes_read++;
+	}
+	while(cur != end_char && bytes_read < max_chars);
+
+	return bytes_read;
+}
+
 void uart1_sendbyte(uint8_t data)
 {
 	while(!(UCSR1A & (1<<UDRE1)));
