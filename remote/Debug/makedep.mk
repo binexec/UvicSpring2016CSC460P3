@@ -6,5 +6,11 @@ adc\adc.c
 
 main.c
 
+rtos\cswitch.s
+
+rtos\kernel.c
+
+rtos\os.c
+
 uart\uart.c
 

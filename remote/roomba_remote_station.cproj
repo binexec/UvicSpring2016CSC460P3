@@ -121,6 +121,21 @@
     <Compile Include="main.c">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="rtos\cswitch.s">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="rtos\kernel.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="rtos\kernel.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="rtos\os.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="rtos\os.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="uart\uart.c">
       <SubType>compile</SubType>
     </Compile>
@@ -130,6 +145,7 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="adc" />
+    <Folder Include="rtos" />
     <Folder Include="uart" />
   </ItemGroup>
   <Import Project="$(AVRSTUDIO_EXE_PATH)\\Vs\\Compiler.targets" />

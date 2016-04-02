@@ -2,6 +2,8 @@
 #include <avr/io.h>
 #include "uart/uart.h"
 #include "adc/adc.h"
+#include "rtos/os.h"
+#include "rtos/kernel.h"
 
 #define NEGATIVE_HIGH			'N'		//reverse in high speed/or turn left high speed
 #define NEGATIVE_LOW			'n'		//reverse in low speed
@@ -76,6 +78,9 @@ void roomba_init()
 	uart1_sendbyte(1);
 	uart1_sendbyte(62);
 	uart1_sendbyte(32);
+	
+	direction = NOT_MOVING;
+	speed = NOT_MOVING;
 }
 
 void beep()
@@ -113,52 +118,56 @@ void move_as_global()
 {
 	int16_t vel;
 	int16_t rad;
-	
-	switch(direction)
+
+	while (1)
 	{
-		case NEGATIVE_HIGH:
-			rad = -1;
-			break;
-		case NEGATIVE_LOW:
-			rad = 500;
-			break;
-		case POSITIVE_LOW:
-			rad = 500;
-			break;
-		case POSITIVE_HIGH:
-			rad = 1;
-			break;
-		case NOT_MOVING:
-		default:
-			rad = 0;
-			break;
-	}
+		switch(direction)
+		{
+			case NEGATIVE_HIGH:
+				rad = -1;
+				break;
+			case NEGATIVE_LOW:
+				rad = 500;
+				break;
+			case POSITIVE_LOW:
+				rad = 500;
+				break;
+			case POSITIVE_HIGH:
+				rad = 1;
+				break;
+			case NOT_MOVING:
+			default:
+				rad = 0;
+				break;
+		}
 	
-	switch(speed)
-	{
-		case NEGATIVE_HIGH:
-			vel = -500;
-			break;
-		case NEGATIVE_LOW:
-			vel = -250;
-			break;
-		case POSITIVE_LOW:
+		switch(speed)
+		{
+			case NEGATIVE_HIGH:
+				vel = -500;
+				break;
+			case NEGATIVE_LOW:
+				vel = -250;
+				break;
+			case POSITIVE_LOW:
+				vel = 250;
+				break;
+			case POSITIVE_HIGH:
+				vel = 500;
+				break;
+			case NOT_MOVING:
+			default:
+				vel = 0;
+				break;
+		}
+	
+		if (rad == 1 || rad == -1) {
 			vel = 250;
-			break;
-		case POSITIVE_HIGH:
-			vel = 500;
-			break;
-		case NOT_MOVING:
-		default:
-			vel = 0;
-			break;
-	}
+		}
 	
-	if (rad == 1 || rad == -1) {
-		vel = 250;
+		drive(vel, rad);
+		Task_Sleep(2);
 	}
-	
-	drive(vel, rad);
 }
 
 void query_sensors()
@@ -202,21 +211,24 @@ void send_query_list()
 int receive_and_update()
 {
 	uint8_t curbyte;
-	curbyte = uart0_recvbyte();
-	uint8_t count = 0;
-	while (curbyte != '$')
+	uint8_t count;
+	while(1)
 	{
-		if (count > 6) {
-			return (1);		// failed
-		}
 		curbyte = uart0_recvbyte();
-	}
+		count = 0;
+		while (curbyte != '$')
+		{
+			if (++count > 6) {
+				return (1);		// failed
+			}
+			curbyte = uart0_recvbyte();
+		}
 	
-	direction = uart0_recvbyte();
-	speed = uart0_recvbyte();
-	return (0);	
+		direction = uart0_recvbyte();
+		speed = uart0_recvbyte();
+		Task_Sleep(3);	
+	}
 }
-
 void calibratePhotores()
 {
 	int i;
@@ -244,34 +256,28 @@ int isHit()
 	return photores > 1.2*photores_neutral;
 }
 
-int main()
+int a_main()
 {
+	OS_Init();
+	
 	uart0_init();		//UART0 is used for BT
 	uart1_init();		//UART1 is used to communicate with the robot
 	roomba_init();
+	beep();
 	
 	//uart0_sendstr("Robot initialized!\n");
 	//uart_setredir();
-	beep();
-	
+	Task_Create(receive_and_update, 5, 0);
+	Task_Create(move_as_global, 4, 0);
+	/*
 	while(1)
 	{
-		/*
-		//beep();
-		drive(100,DRIVE_STRAIGHT);
-		_delay_ms(2000);
-		//beep();
-		drive(100,CLOCKWISE_TURN);
-		_delay_ms(2000);
-		query_sensors();
-		_delay_ms(1);
-		send_query_list();*/
 		receive_and_update();
 		move_as_global();
 		_delay_ms(30);
 	}
-	
-	return 0;
+	*/
+	OS_Start();
 }
 
 

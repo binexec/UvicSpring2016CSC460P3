@@ -34,6 +34,7 @@ LINKER_SCRIPT_DEP:=
 # Every subdirectory with source files must be described here
 SUBDIRS :=  \
 ../adc \
+../rtos \
 ../uart
 
 
@@ -41,10 +42,13 @@ SUBDIRS :=  \
 C_SRCS +=  \
 ../adc/adc.c \
 ../main.c \
+../rtos/kernel.c \
+../rtos/os.c \
 ../uart/uart.c
 
 
-PREPROCESSING_SRCS += 
+PREPROCESSING_SRCS +=  \
+../rtos/cswitch.s
 
 
 ASM_SRCS += 
@@ -53,21 +57,33 @@ ASM_SRCS +=
 OBJS +=  \
 adc/adc.o \
 main.o \
+rtos/cswitch.o \
+rtos/kernel.o \
+rtos/os.o \
 uart/uart.o
 
 OBJS_AS_ARGS +=  \
 adc/adc.o \
 main.o \
+rtos/cswitch.o \
+rtos/kernel.o \
+rtos/os.o \
 uart/uart.o
 
 C_DEPS +=  \
 adc/adc.d \
 main.d \
+rtos/cswitch.d \
+rtos/kernel.d \
+rtos/os.d \
 uart/uart.d
 
 C_DEPS_AS_ARGS +=  \
 adc/adc.d \
 main.d \
+rtos/cswitch.d \
+rtos/kernel.d \
+rtos/os.d \
 uart/uart.d
 
 OUTPUT_FILE_PATH +=roomba_remote_station.elf
@@ -91,6 +107,10 @@ LINKER_SCRIPT_DEP+=
 
 
 
+
+
+
+
 adc/%.o: ../adc/%.c
 	@echo Building file: $<
 	@echo Invoking: AVR/GNU C Compiler : 4.9.2
@@ -99,6 +119,13 @@ adc/%.o: ../adc/%.c
 	
 
 ./%.o: .././%.c
+	@echo Building file: $<
+	@echo Invoking: AVR/GNU C Compiler : 4.9.2
+	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\avr8\avr8-gnu-toolchain\bin\avr-gcc.exe$(QUOTE)  -x c -funsigned-char -funsigned-bitfields -DDEBUG -DF_CPU=16000000UL -DBAUD=19200  -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\ATmega_DFP\1.0.90\include"  -O1 -ffunction-sections -fdata-sections -fpack-struct -fshort-enums -mrelax -g2 -Wall -mmcu=atmega2560 -B "C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\ATmega_DFP\1.0.90\gcc\dev\atmega2560" -c -std=gnu99 -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 
+	@echo Finished building: $<
+	
+
+rtos/%.o: ../rtos/%.c
 	@echo Building file: $<
 	@echo Invoking: AVR/GNU C Compiler : 4.9.2
 	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\avr8\avr8-gnu-toolchain\bin\avr-gcc.exe$(QUOTE)  -x c -funsigned-char -funsigned-bitfields -DDEBUG -DF_CPU=16000000UL -DBAUD=19200  -I"C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\ATmega_DFP\1.0.90\include"  -O1 -ffunction-sections -fdata-sections -fpack-struct -fshort-enums -mrelax -g2 -Wall -mmcu=atmega2560 -B "C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\ATmega_DFP\1.0.90\gcc\dev\atmega2560" -c -std=gnu99 -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)"   -o "$@" "$<" 
@@ -119,6 +146,20 @@ uart/%.o: ../uart/%.c
 
 
 # AVR32/GNU Assembler
+rtos/cswitch.o: ../rtos/cswitch.s
+	@echo Building file: $<
+	@echo Invoking: AVR/GNU Assembler : 4.9.2
+	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\avr8\avr8-gnu-toolchain\bin\avr-gcc.exe$(QUOTE) -Wa,-gdwarf2 -x assembler-with-cpp -c -mmcu=atmega2560 -B "C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\ATmega_DFP\1.0.90\gcc\dev\atmega2560" -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)" -mrelax -Wa,-g   -o "$@" "$<" 
+	@echo Finished building: $<
+	
+
+
+rtos/%.o: ../rtos/%.s
+	@echo Building file: $<
+	@echo Invoking: AVR/GNU Assembler : 4.9.2
+	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\avr8\avr8-gnu-toolchain\bin\avr-gcc.exe$(QUOTE) -Wa,-gdwarf2 -x assembler-with-cpp -c -mmcu=atmega2560 -B "C:\Program Files (x86)\Atmel\Studio\7.0\Packs\atmel\ATmega_DFP\1.0.90\gcc\dev\atmega2560" -MD -MP -MF "$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)" -mrelax -Wa,-g   -o "$@" "$<" 
+	@echo Finished building: $<
+	
 
 
 
