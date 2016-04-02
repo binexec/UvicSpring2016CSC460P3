@@ -14,8 +14,8 @@
 //pins
 #define PHOTORESIS_PIN   0		//photosensor pin on A0
 
-#define SENSORS_TO_QUERY 4		//How many sensors are we querying from the robot?
-#define TWO_BYTE_SENSORS 1		//How many of the sensors above returns 2 bytes of data instead of 1?
+#define SENSORS_TO_QUERY 2		//How many sensors are we querying from the robot?
+#define TWO_BYTE_SENSORS 0		//How many of the sensors above returns 2 bytes of data instead of 1?
 
 //Special case values for radius, used for drive
 #define DRIVE_STRAIGHT			0x7FFF			//32767
@@ -66,8 +66,19 @@ void start_robot_safe()
 	uart1_sendbyte(131);		//Switch to SAFE mode
 }
 
+void beep()
+{
+	//Play the beep "song" created in roomba_init
+	uart1_sendbyte(141);
+	uart1_sendbyte(0);
+}
+
 void roomba_init()
 {
+	//Default values
+	direction = NOT_MOVING;
+	speed = NOT_MOVING;
+	
 	switch_uart_19200();
 	start_robot_safe();
 	
@@ -78,18 +89,8 @@ void roomba_init()
 	uart1_sendbyte(1);
 	uart1_sendbyte(62);
 	uart1_sendbyte(32);
-	
-	direction = NOT_MOVING;
-	speed = NOT_MOVING;
+	beep();
 }
-
-void beep()
-{		
-	//Play the beep "song" created in roomba_init
-	uart1_sendbyte(141);
-	uart1_sendbyte(0);
-}
-
 
 void drive(int16_t vel, int16_t rad)
 {
@@ -166,48 +167,81 @@ void move_as_global()
 		}
 	
 		drive(vel, rad);
-		Task_Sleep(2);
+		Task_Sleep(3);
 	}
 }
 
-void query_sensors()
-{
-	uart1_sendbyte(149);				//Opcode for Query List
-	uart1_sendbyte(SENSORS_TO_QUERY);	//Query will send three sensors packets
-	uart1_sendbyte(7);					//Packet 7: Bump/Wheeldrop detection
-	uart1_sendbyte(8);					//Packet 8: Wall seen?
-	uart1_sendbyte(27);					//Packet 27: Strength of wall signal (Two bytes)
-	uart1_sendbyte(13);					//Packet 13: Virtual wall seen?
-}
 
-void send_query_list()
+void handle_sensors()
 {
 	uint8_t i;
-	uint8_t curbyte;
+	uint8_t bytes[SENSORS_TO_QUERY + TWO_BYTE_SENSORS];
 	
-	//Sends preamble to base
-	uart0_sendstr(SENSOR_DATA);
+	//Roomba sends 8 bytes of unnecessary data, so we have to ignore them
+	//for(i=0; i<7; i++) uart1_recvbyte();
 	
-	for(i=0; i<SENSORS_TO_QUERY + TWO_BYTE_SENSORS; i++)
+	
+	while(1)
 	{
-		curbyte = uart1_recvbyte();		//Read a byte returned by the robot
-		uart0_sendbyte(curbyte);		//Forward the byte back to the base station via BT 
-	}
+		/*Queries the sensors*/
+		
+		uart1_sendbyte(149);				//Opcode for Query List
+		uart1_sendbyte(SENSORS_TO_QUERY);	//Query will send three sensors packets
+		uart1_sendbyte(7);					//Packet 7: Bump/Wheeldrop detection
+		uart1_sendbyte(13);					//Packet 13: Virtual wall seen?
 	
-	/*
-		Currently, the data bytes for the following sensors will be returned in order:
-			1: Bump/Wheeldrop
-			2: Wall detection
-			3: Upper byte of wall strength
-			4: Lower byte of wall strength
-			5: Virtual wall detection 
-			
-		Note that after robot initialization, the robot will send 8 bytes of unneeded data back to the base station.
-		Be sure to ignore these 8 bytes.
-	*/
+		Task_Sleep(2);
+	
+		//Read sensor data returned by the roomba
+		for(i=0; i<SENSORS_TO_QUERY + TWO_BYTE_SENSORS; i++)
+			bytes[i] = uart1_recvbyte();		//Read a byte returned by the robot
+	
+		/*
+			Currently, the data bytes for the following sensors will be returned in order:
+				1: Bump/Wheeldrop
+				2: Virtual wall detection 
+			Note that after robot initialization, the robot will send 8 bytes of unneeded data back to the base station.
+			Be sure to ignore these 8 bytes.
+		*/
+	
+		/*BELOW SENSOR ARE INTENDED FOR MANUAL CONTROLS*/
+	
+		//If the left bumper has been hit, back up a bit and then rotate 90 degrees to the right
+		if(bytes[0] == 1)
+		{
+			beep();
+			drive(-200, DRIVE_STRAIGHT);
+			_delay_ms(200);
+			drive(200,COUNTER_CLOCKWISE_TURN);
+			_delay_ms(1000);
+			drive(0,0);
+		}
+		//If the right bumper has been hit, back up a bit and then rotate 90 degrees  to the right
+		else if(bytes[0] == 2)
+		{
+			beep();
+			drive(-200, DRIVE_STRAIGHT);
+			_delay_ms(200);
+			drive(200,CLOCKWISE_TURN);
+			_delay_ms(1000);
+			drive(0,0);
+		}
+		//If the middle has been hit or virtual wall has been detected, back up a bit and then rotate 180 degrees 
+		//else if (bytes[0] == 3 || bytes[1] == 1)
+		else if (bytes[0] == 3)
+		{
+			beep();
+			drive(-200, DRIVE_STRAIGHT);
+			_delay_ms(200);
+			drive(200,COUNTER_CLOCKWISE_TURN);
+			_delay_ms(2000);
+			drive(0,0);
+		}
+	
+		Task_Sleep(3);
+	}
 }
 
-// return 0 if success, 1 otherwise
 int receive_and_update()
 {
 	uint8_t curbyte;
@@ -218,15 +252,17 @@ int receive_and_update()
 		count = 0;
 		while (curbyte != '$')
 		{
-			if (++count > 6) {
-				return (1);		// failed
-			}
+			if (++count > 6)
+				goto receive_and_update_continue;
+				
 			curbyte = uart0_recvbyte();
 		}
 	
 		direction = uart0_recvbyte();
 		speed = uart0_recvbyte();
-		Task_Sleep(3);	
+		
+receive_and_update_continue:
+		Task_Sleep(8);	
 	}
 }
 void calibratePhotores()
@@ -256,7 +292,7 @@ int isHit()
 	return photores > 1.2*photores_neutral;
 }
 
-int a_main()
+void a_main()
 {
 	OS_Init();
 	
@@ -265,18 +301,10 @@ int a_main()
 	roomba_init();
 	beep();
 	
-	//uart0_sendstr("Robot initialized!\n");
-	//uart_setredir();
-	Task_Create(receive_and_update, 5, 0);
-	Task_Create(move_as_global, 4, 0);
-	/*
-	while(1)
-	{
-		receive_and_update();
-		move_as_global();
-		_delay_ms(30);
-	}
-	*/
+	Task_Create(receive_and_update, 4, 0);
+	Task_Create(move_as_global, 5, 0);
+	Task_Create(handle_sensors, 3, 0);
+	
 	OS_Start();
 }
 
