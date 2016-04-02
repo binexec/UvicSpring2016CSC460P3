@@ -8,40 +8,17 @@
 // cords are facing you
 
 //Special case values for speed, used in reading joystick
-#define NEGATIVE_HIGH			0x0		//reverse in high speed/or turn left high speed
-#define NEGATIVE_LOW			0x1		//reverse in low speed
-#define NOT_MOVING				0x2
-#define POSITIVE_LOW			0x3
-#define POSITIVE_HIGH			0x4
+#define NEGATIVE_HIGH			'N'		//reverse in high speed/or turn left high speed
+#define NEGATIVE_LOW			'n'		//reverse in low speed
+#define NOT_MOVING				'z'
+#define POSITIVE_LOW			'p'
+#define POSITIVE_HIGH			'P'
 
 #define THRESHOLD_1				50		//lower than threshold 1 is NEGATIVE_HIGH
 #define THRESHOLD_2				482		//between threshold 1 is NEGATIVE
 #define THRESHOLD_3				542		//not moving
 #define THRESHOLD_4				974		// lower then P_low higher then P_high
 
-
-
-void switch_uart_19200()
-{
-	DDRB |= (1<<PB0);		//Use ping 53 for BRC
-	PORTB |= (1<<PB0);		//Initialize BRC as high
-	_delay_ms(2000);
-	
-	//Pulse BRC three times
-	PORTB &= ~(1<<PB0);
-	_delay_ms(100);
-	PORTB |= (1<<PB0);
-	_delay_ms(100);
-	
-	PORTB &= ~(1<<PB0);
-	_delay_ms(100);
-	PORTB |= (1<<PB0);
-	_delay_ms(100);
-	
-	PORTB &= ~(1<<PB0);
-	_delay_ms(100);
-	PORTB |= (1<<PB0);
-}
 /*
 void InitADC(void)
 {
@@ -63,7 +40,7 @@ uint16_t readadc(uint8_t ch)
 // within low and high threshold is 0
 // higher than 1000, lower than 24 is high speed 2/-2
 // in between the threshold and high speed is low speed, 1/-1
-uint8_t readAndFilter(uint8_t ch)
+char readAndFilter(uint8_t ch)
 {
 	uint16_t num = readadc(ch);
 	if (num < THRESHOLD_1)
@@ -80,11 +57,11 @@ uint8_t readAndFilter(uint8_t ch)
 
 void readAndSend()
 {
-	uint8_t direction = readAndFilter(0);   // read ch 0 which is to Y of the joystick
-	uint8_t speed = readAndFilter(1);		// read ch 1 which is the X of the joystick
-	//char a,b;
-	//a = direction  + '0';
-	//b = speed + '0';
+	char direction = readAndFilter(0);   // read ch 0 which is to Y of the joystick
+	char speed = readAndFilter(1);		// read ch 1 which is the X of the joystick
+	char a,b;
+	a = direction  + '0';
+	b = speed + '0';
 	uart0_sendbyte('$');
 	uart0_sendbyte(direction);
 	uart0_sendbyte(speed);

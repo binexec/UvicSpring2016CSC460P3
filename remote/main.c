@@ -26,9 +26,9 @@
 #define SENSOR_DATA ((const char *) "!SD\n")
 
 // gloable variable
-uint8_t direction;
-uint8_t speed;
-uint16_t photores_neutral;
+volatile uint8_t direction;
+volatile uint8_t speed;
+volatile photores_neutral;
 
 void switch_uart_19200()
 {
@@ -207,7 +207,7 @@ int main()
 		_delay_ms(1);
 		send_query_list();*/
 		receive_and_update();
-		printf("d:%u, s:%u\n", direction, speed);
+		printf("d:%c, s:%c\n", direction, speed);
 	}
 	
 	return 0;
