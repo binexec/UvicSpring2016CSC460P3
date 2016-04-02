@@ -12,7 +12,7 @@ int main(void)
 	
 	while (1) 
     {
-		printf("%u\n", uart1_recvbyte()); 
+		printf("rec: %c\n", uart1_recvbyte()); 
     }
 }
 

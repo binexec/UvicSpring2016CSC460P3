@@ -1,6 +1,7 @@
 #include <util/delay.h>
 #include <avr/io.h>
 #include "uart/uart.h"
+#include "adc/adc.h"
 
 // use Y on ch 0 as left and right
 // use X on ch 1 as forward and backward
@@ -41,7 +42,7 @@ void switch_uart_19200()
 	_delay_ms(100);
 	PORTB |= (1<<PB0);
 }
-
+/*
 void InitADC(void)
 {
 	ADMUX|=(1<<REFS0);
@@ -55,6 +56,7 @@ uint16_t readadc(uint8_t ch)
 	while((ADCSRA)&(1<<ADSC));    //WAIT UNTIL CONVERSION IS COMPLETE
 	return(ADC);        //RETURN ADC VALUE
 }
+*/
 // example from: http://www.embedds.com/interfacing-analog-joystick-with-avr/
 
 // read ch and filter it into 7 levels
@@ -80,18 +82,18 @@ void readAndSend()
 {
 	uint8_t direction = readAndFilter(0);   // read ch 0 which is to Y of the joystick
 	uint8_t speed = readAndFilter(1);		// read ch 1 which is the X of the joystick
-	char a,b;
-	a = direction  + '0';
-	b = speed + '0';
-	uart_sendbyte('$');
-	uart_sendbyte(a);
-	uart_sendbyte(b);
-	uart_sendbyte('#');
+	//char a,b;
+	//a = direction  + '0';
+	//b = speed + '0';
+	uart0_sendbyte('$');
+	uart0_sendbyte(direction);
+	uart0_sendbyte(speed);
+	uart0_sendbyte('#');
 }
 
 int main(void)
 {
-	uart_init();
+	uart0_init();
 	InitADC();
 
 	uint16_t num;
@@ -106,6 +108,8 @@ int main(void)
 		printf("adc1: %s\n", a);
 		*/
 		readAndSend();
+		_delay_ms(100);
+
 		// result: x mid position is 504
 		//         y mid position is 518
 		// range from 0 - 1024
