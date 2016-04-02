@@ -3,6 +3,12 @@
 #include "uart/uart.h"
 #include "adc/adc.h"
 
+#define NEGATIVE_HIGH			'N'		//reverse in high speed/or turn left high speed
+#define NEGATIVE_LOW			'n'		//reverse in low speed
+#define NOT_MOVING				'z'
+#define POSITIVE_LOW			'p'
+#define POSITIVE_HIGH			'P'
+
 //pins
 #define PHOTORESIS_PIN   0		//photosensor pin on A0
 
@@ -26,8 +32,8 @@
 #define SENSOR_DATA ((const char *) "!SD\n")
 
 // gloable variable
-volatile uint8_t direction;
-volatile uint8_t speed;
+volatile char direction;
+volatile char speed;
 volatile photores_neutral;
 
 void switch_uart_19200()
@@ -82,6 +88,8 @@ void beep()
 
 void drive(int16_t vel, int16_t rad)
 {
+	//printf("vel: %d, rad: %d\n", vel, rad);
+	
 	//Making sure velocity is within valid range
 	if(vel < -500) 
 		vel = -500;
@@ -99,6 +107,58 @@ void drive(int16_t vel, int16_t rad)
 	uart1_sendbyte(vel);				//velocity low byte
 	uart1_sendbyte(rad >> 8);			//Radius high byte
 	uart1_sendbyte(rad);				//Radius low byte
+}
+
+void move_as_global()
+{
+	int16_t vel;
+	int16_t rad;
+	
+	switch(direction)
+	{
+		case NEGATIVE_HIGH:
+			rad = -1;
+			break;
+		case NEGATIVE_LOW:
+			rad = 500;
+			break;
+		case POSITIVE_LOW:
+			rad = 500;
+			break;
+		case POSITIVE_HIGH:
+			rad = 1;
+			break;
+		case NOT_MOVING:
+		default:
+			rad = 0;
+			break;
+	}
+	
+	switch(speed)
+	{
+		case NEGATIVE_HIGH:
+			vel = -500;
+			break;
+		case NEGATIVE_LOW:
+			vel = -250;
+			break;
+		case POSITIVE_LOW:
+			vel = 250;
+			break;
+		case POSITIVE_HIGH:
+			vel = 500;
+			break;
+		case NOT_MOVING:
+		default:
+			vel = 0;
+			break;
+	}
+	
+	if (rad == 1 || rad == -1) {
+		vel = 250;
+	}
+	
+	drive(vel, rad);
 }
 
 void query_sensors()
@@ -142,18 +202,18 @@ void send_query_list()
 int receive_and_update()
 {
 	uint8_t curbyte;
-	curbyte = uart1_recvbyte();
+	curbyte = uart0_recvbyte();
 	uint8_t count = 0;
 	while (curbyte != '$')
 	{
 		if (count > 6) {
 			return (1);		// failed
 		}
-		curbyte = uart1_recvbyte();
+		curbyte = uart0_recvbyte();
 	}
 	
-	direction = uart1_recvbyte();
-	speed = uart1_recvbyte();
+	direction = uart0_recvbyte();
+	speed = uart0_recvbyte();
 	return (0);	
 }
 
@@ -190,9 +250,9 @@ int main()
 	uart1_init();		//UART1 is used to communicate with the robot
 	roomba_init();
 	
-	uart0_sendstr("Robot initialized!\n");
-	
-	uart_setredir();
+	//uart0_sendstr("Robot initialized!\n");
+	//uart_setredir();
+	beep();
 	
 	while(1)
 	{
@@ -207,7 +267,8 @@ int main()
 		_delay_ms(1);
 		send_query_list();*/
 		receive_and_update();
-		printf("d:%c, s:%c\n", direction, speed);
+		move_as_global();
+		_delay_ms(30);
 	}
 	
 	return 0;
