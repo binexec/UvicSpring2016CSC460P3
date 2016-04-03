@@ -14,6 +14,9 @@
 #define POSITIVE_LOW			'p'
 #define POSITIVE_HIGH			'P'
 
+#define FIRE					'F'
+#define HOLD					"H"
+
 #define THRESHOLD_1				50		//lower than threshold 1 is NEGATIVE_HIGH
 #define THRESHOLD_2				482		//between threshold 1 is NEGATIVE
 #define THRESHOLD_3				542		//not moving
@@ -59,9 +62,15 @@ void readAndSend()
 {
 	char direction = readAndFilter(0);   // read ch 0 which is to Y of the joystick
 	char speed = readAndFilter(1);		// read ch 1 which is the X of the joystick
-	char a,b;
-	a = direction  + '0';
-	b = speed + '0';
+	char fire;
+	
+	if (PINB & (1<<PB1))
+		//fire = HOLD;
+		PORTB &= ~(1<<PB2);	//pin 51 off	
+	else
+		//fire = FIRE;
+		PORTB |= (1<<PB2);	//pin 51 on
+		
 	uart0_sendbyte('$');
 	uart0_sendbyte(direction);
 	uart0_sendbyte(speed);
@@ -72,8 +81,16 @@ int main(void)
 {
 	uart0_init();
 	InitADC();
-
-	uint16_t num;
+	//DDRB &= ~(1<<PB1);	//to 0
+	//PORTB |= (1<<PB1)	//to 1
+	//DDRx &= ~(1<<4); //To clear a bit (Same as DDRx.4 = 0)
+	//DDRx |= ~(1<<4); //To set a bit (Same as DDRx.4 = 1)
+	//DDRx ^= ~(1<<4); //TOGGLE bit 4 in DDRx register
+	DDRB &= ~(1<<PB1);  // set pin 52 to input
+	PORTB |= (1<<PB1);  // enable pull up
+	
+	DDRB |= (1<<PB2);	// pin 51 as ouput
+	
 	while (1)
 	{
 		/*num = readadc(0);
