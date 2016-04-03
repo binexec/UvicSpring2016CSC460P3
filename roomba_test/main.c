@@ -22,6 +22,7 @@
 #define SENSOR_DATA ((const char *) "!SD\n")
 
 volatile uint16_t photores_neutral;
+uint16_t photores_thres;
 
 void switch_uart_19200()
 {
@@ -156,6 +157,7 @@ void calibratePhotores()
 		_delay_ms(200);
 	}
 	photores_neutral /= i;     //Use the average as neutral value
+	photores_thres = photores_neutral*1.75;
 
 }
 
@@ -165,12 +167,7 @@ int isHit()
 	printf("value: %u\n", photores);
 
 	//Determine laser hits based on the brightness of the ambient lightint
-	if(photores_neutral < 150)
-	return photores > 3*photores_neutral;
-	else if (photores_neutral < 250)
-	return photores > 2*photores_neutral;
-	else
-	return photores > 1.2*photores_neutral;
+	return photores > photores_thres;
 }
 
 int main()
@@ -199,10 +196,10 @@ int main()
 		_delay_ms(1);
 		send_query_list();
 		*/
-		/*if(isHit()) {
+		if(isHit()) {
 			printf("Is hit!\n");
 		} else
-			printf("not hit\n");*/
+			printf("not hit\n");
 		//printf("");
 		_delay_ms(1000);
 	}

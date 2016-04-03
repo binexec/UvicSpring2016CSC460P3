@@ -15,7 +15,7 @@
 #define POSITIVE_HIGH			'P'
 
 #define FIRE					'F'
-#define HOLD					"H"
+#define HOLD					'H'
 
 #define THRESHOLD_1				50		//lower than threshold 1 is NEGATIVE_HIGH
 #define THRESHOLD_2				482		//between threshold 1 is NEGATIVE
@@ -65,15 +65,16 @@ void readAndSend()
 	char fire;
 	
 	if (PINB & (1<<PB1))
-		//fire = HOLD;
-		PORTB &= ~(1<<PB2);	//pin 51 off	
+		fire = HOLD;
+		//PORTB &= ~(1<<PB2);	//pin 51 off	
 	else
-		//fire = FIRE;
-		PORTB |= (1<<PB2);	//pin 51 on
+		fire = FIRE;
+		//PORTB |= (1<<PB2);	//pin 51 on
 		
 	uart0_sendbyte('$');
 	uart0_sendbyte(direction);
 	uart0_sendbyte(speed);
+	uart0_sendbyte(fire);
 	uart0_sendbyte('#');
 }
 

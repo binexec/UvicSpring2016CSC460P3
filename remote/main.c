@@ -11,6 +11,9 @@
 #define POSITIVE_LOW			'p'
 #define POSITIVE_HIGH			'P'
 
+#define FIRE					'F'
+#define HOLD					'H'
+
 //pins
 #define PHOTORESIS_PIN   0		//photosensor pin on A0
 
@@ -34,9 +37,14 @@
 #define SENSOR_DATA ((const char *) "!SD\n")
 
 // gloable variable
-volatile char direction;
-volatile char speed;
+volatile char direction = NOT_MOVING;
+volatile char last_direction = NOT_MOVING;
+volatile char speed = NOT_MOVING;
+volatile char last_speed = NOT_MOVING;
+volatile char fire = HOLD;
+uint16_t photores_thres;
 volatile uint16_t photores_neutral;
+volatile uint8_t isDead = 0;
 
 void switch_uart_19200()
 {
@@ -73,6 +81,20 @@ void beep()
 	uart1_sendbyte(0);
 }
 
+void calibratePhotores()
+{
+	int i;
+
+	//Sample the ambient lighting 10 times
+	for(i=0; i<10; i++)
+	{
+		photores_neutral += readadc(PHOTORESIS_PIN);
+		_delay_ms(100);
+	}
+	photores_neutral /= i;     //Use the average as neutral value
+	photores_thres = 1.1*photores_neutral;
+}
+
 void roomba_init()
 {
 	//Default values
@@ -81,6 +103,7 @@ void roomba_init()
 	
 	switch_uart_19200();
 	start_robot_safe();
+	calibratePhotores();
 	
 	//Write a "song" for the beep into slot 0
 	//Example from: http://www.robotappstore.com/Knowledge-Base/4-How-to-Send-Commands-to-Roomba/18.html
@@ -119,9 +142,14 @@ void move_as_global()
 {
 	int16_t vel;
 	int16_t rad;
-
 	while (1)
 	{
+		if (isDead) {
+			Task_Terminate();
+		}
+		if (direction == last_direction && speed == last_speed)
+			goto move_as_global_continue;
+		
 		switch(direction)
 		{
 			case NEGATIVE_HIGH:
@@ -164,13 +192,27 @@ void move_as_global()
 	
 		if (rad == 1 || rad == -1) {
 			vel = 250;
+		} else if (rad == 0 && vel == 0) {
+			vel = 250;
 		}
 	
 		drive(vel, rad);
+
+move_as_global_continue:
+		if (fire == HOLD)
+			PORTB &= ~(1<<PB2);	//pin 51 off
+		else
+		if (fire == FIRE)
+			PORTB |= (1<<PB2);	//pin 51 on
 		Task_Sleep(3);
 	}
 }
 
+int isHit()
+{
+	uint16_t val = readadc(PHOTORESIS_PIN); 
+	return val > photores_thres;
+}
 
 void handle_sensors()
 {
@@ -190,7 +232,21 @@ void handle_sensors()
 		uart1_sendbyte(7);					//Packet 7: Bump/Wheeldrop detection
 		uart1_sendbyte(13);					//Packet 13: Virtual wall seen?
 	
-		Task_Sleep(2);
+		Task_Sleep(2);						//End of upper half of handle_sensor
+		
+		//Check if laser has hit our photosensor
+		if (isHit()) 
+		{
+			//isDead = 1;
+			//drive(0,0);
+			beep();
+			_delay_ms(200);
+			beep();
+			_delay_ms(200);
+			beep();
+			//uart1_sendbyte(128);	//start command to go to passive mode
+			//Task_Terminate();
+		}
 	
 		//Read sensor data returned by the roomba
 		for(i=0; i<SENSORS_TO_QUERY + TWO_BYTE_SENSORS; i++)
@@ -248,6 +304,10 @@ int receive_and_update()
 	uint8_t count;
 	while(1)
 	{
+		if (isDead) {
+			Task_Terminate();
+		}
+		
 		curbyte = uart0_recvbyte();
 		count = 0;
 		while (curbyte != '$')
@@ -258,42 +318,21 @@ int receive_and_update()
 			curbyte = uart0_recvbyte();
 		}
 	
+		last_direction = direction;
+		last_speed = speed;
+	
 		direction = uart0_recvbyte();
 		speed = uart0_recvbyte();
+		fire = uart0_recvbyte();
 		
 receive_and_update_continue:
 		Task_Sleep(8);	
 	}
 }
-void calibratePhotores()
-{
-	int i;
-
-	//Sample the ambient lighting 10 times
-	for(i=0; i<10; i++)
-	{
-		photores_neutral += readadc(PHOTORESIS_PIN);
-		_delay_ms(200);
-	}
-	photores_neutral /= i;     //Use the average as neutral value
-
-}
-
-int isHit()
-{
-	uint16_t photores = readadc(PHOTORESIS_PIN);
-
-	//Determine laser hits based on the brightness of the ambient lightint
-	if(photores_neutral < 150)
-		return photores > 3*photores_neutral;
-	else if (photores_neutral < 250)
-		return photores > 2*photores_neutral;
-	else
-		return photores > 1.2*photores_neutral;
-}
 
 void a_main()
 {
+	DDRB |= (1<<PB2);	// pin 51 as ouput	
 	OS_Init();
 	
 	uart0_init();		//UART0 is used for BT
