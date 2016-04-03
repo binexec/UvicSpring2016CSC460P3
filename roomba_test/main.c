@@ -21,6 +21,8 @@
 //Command/OPcodes remote station sends to base
 #define SENSOR_DATA ((const char *) "!SD\n")
 
+volatile uint16_t photores_neutral;
+
 void switch_uart_19200()
 {
 	DDRB |= (1<<PB0);		//Use ping 53 for BRC
@@ -129,16 +131,64 @@ void send_query_list()
 	*/
 }
 
+void InitADC(void)
+{
+	ADMUX|=(1<<REFS0);
+	ADCSRA|=(1<<ADEN)|(1<<ADPS0)|(1<<ADPS1)|(1<<ADPS2); //ENABLE ADC, PRESCALER 128
+}
+uint16_t readadc(uint8_t ch)
+{
+	ch&=0b00000111;         //ANDing to limit input to 7
+	ADMUX = (ADMUX & 0xf8)|ch;  //Clear last 3 bits of ADMUX, OR with ch
+	ADCSRA|=(1<<ADSC);        //START CONVERSION
+	while((ADCSRA)&(1<<ADSC));    //WAIT UNTIL CONVERSION IS COMPLETE
+	return(ADC);        //RETURN ADC VALUE
+}
+
+void calibratePhotores()
+{
+	int i;
+
+	//Sample the ambient lighting 10 times
+	for(i=0; i<10; i++)
+	{
+		photores_neutral += readadc(0);
+		_delay_ms(200);
+	}
+	photores_neutral /= i;     //Use the average as neutral value
+
+}
+
+int isHit()
+{
+	uint16_t photores = readadc(0);
+	printf("value: %u\n", photores);
+
+	//Determine laser hits based on the brightness of the ambient lightint
+	if(photores_neutral < 150)
+	return photores > 3*photores_neutral;
+	else if (photores_neutral < 250)
+	return photores > 2*photores_neutral;
+	else
+	return photores > 1.2*photores_neutral;
+}
+
 int main()
 {
 	uart0_init();		//UART0 is used for BT
 	uart1_init();		//UART1 is used to communicate with the robot
-	roomba_init();
+	//roomba_init();
 	
-	uart0_sendstr("Robot initialized!\n");
+	//uart0_sendstr("Robot initialized!\n");
+	InitADC();
+	calibratePhotores();
+	uart_setredir();
+	
+	printf("hello\n");
 	
 	while(1)
 	{
+		/*
 		//beep();
 		drive(100,DRIVE_STRAIGHT);
 		_delay_ms(2000);
@@ -148,6 +198,13 @@ int main()
 		query_sensors();
 		_delay_ms(1);
 		send_query_list();
+		*/
+		/*if(isHit()) {
+			printf("Is hit!\n");
+		} else
+			printf("not hit\n");*/
+		//printf("");
+		_delay_ms(1000);
 	}
 	
 	return 0;

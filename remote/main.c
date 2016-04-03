@@ -36,7 +36,7 @@
 // gloable variable
 volatile char direction;
 volatile char speed;
-volatile photores_neutral;
+volatile uint16_t photores_neutral;
 
 void switch_uart_19200()
 {
@@ -285,11 +285,11 @@ int isHit()
 
 	//Determine laser hits based on the brightness of the ambient lightint
 	if(photores_neutral < 150)
-	return photores > 3*photores_neutral;
+		return photores > 3*photores_neutral;
 	else if (photores_neutral < 250)
-	return photores > 2*photores_neutral;
+		return photores > 2*photores_neutral;
 	else
-	return photores > 1.2*photores_neutral;
+		return photores > 1.2*photores_neutral;
 }
 
 void a_main()
