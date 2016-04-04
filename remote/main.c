@@ -92,7 +92,7 @@ void calibratePhotores()
 		_delay_ms(100);
 	}
 	photores_neutral /= i;     //Use the average as neutral value
-	photores_thres = 1.1*photores_neutral;
+	photores_thres = 1.4*photores_neutral;
 }
 
 void roomba_init()
@@ -144,9 +144,9 @@ void move_as_global()
 	int16_t rad;
 	while (1)
 	{
-		if (isDead) {
+		/*if (isDead) {
 			Task_Terminate();
-		}
+		}*/
 		if (direction == last_direction && speed == last_speed)
 			goto move_as_global_continue;
 		
@@ -211,17 +211,16 @@ move_as_global_continue:
 int isHit()
 {
 	uint16_t val = readadc(PHOTORESIS_PIN); 
+	
+	//uart0_sendstr("PS:\n");
+	//uart0_sendbyte((uint8_t)val);
 	return val > photores_thres;
 }
 
 void handle_sensors()
 {
 	uint8_t i;
-	uint8_t bytes[SENSORS_TO_QUERY + TWO_BYTE_SENSORS];
-	
-	//Roomba sends 8 bytes of unnecessary data, so we have to ignore them
-	//for(i=0; i<7; i++) uart1_recvbyte();
-	
+	uint8_t bytes[SENSORS_TO_QUERY + TWO_BYTE_SENSORS];	
 	
 	while(1)
 	{
@@ -237,14 +236,19 @@ void handle_sensors()
 		//Check if laser has hit our photosensor
 		if (isHit()) 
 		{
-			//isDead = 1;
-			//drive(0,0);
+			isDead = 1;
+			drive(0,0);
 			beep();
-			_delay_ms(200);
-			beep();
-			_delay_ms(200);
-			beep();
-			//uart1_sendbyte(128);	//start command to go to passive mode
+			
+			//Write DEAD on the LEDs
+			uart1_sendbyte(164);
+			uart1_sendbyte(68);
+			uart1_sendbyte(69);
+			uart1_sendbyte(65);
+			uart1_sendbyte(68);
+			
+			//Send the start command to go to passive mode
+			uart1_sendbyte(128);	
 			//Task_Terminate();
 		}
 	
@@ -283,8 +287,9 @@ void handle_sensors()
 			drive(0,0);
 		}
 		//If the middle has been hit or virtual wall has been detected, back up a bit and then rotate 180 degrees 
-		//else if (bytes[0] == 3 || bytes[1] == 1)
-		else if (bytes[0] == 3)
+		
+		//else if (bytes[0] == 3)
+		else if (bytes[0] == 3 || bytes[1] == 1)
 		{
 			beep();
 			drive(-200, DRIVE_STRAIGHT);
@@ -304,9 +309,9 @@ int receive_and_update()
 	uint8_t count;
 	while(1)
 	{
-		if (isDead) {
+		/*if (isDead) {
 			Task_Terminate();
-		}
+		}*/
 		
 		curbyte = uart0_recvbyte();
 		count = 0;
@@ -335,6 +340,7 @@ void a_main()
 	DDRB |= (1<<PB2);	// pin 51 as ouput	
 	OS_Init();
 	
+	InitADC();
 	uart0_init();		//UART0 is used for BT
 	uart1_init();		//UART1 is used to communicate with the robot
 	roomba_init();
