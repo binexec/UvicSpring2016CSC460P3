@@ -1,5 +1,7 @@
 #include "adc.h"
 
+// example from: http://www.embedds.com/interfacing-analog-joystick-with-avr/
+
 void InitADC(void)
 {
 	ADMUX|=(1<<REFS0);

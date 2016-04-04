@@ -118,7 +118,13 @@
     <Compile Include="adc\adc.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="base_declarations.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="main.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="shared.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="uart\uart.c">

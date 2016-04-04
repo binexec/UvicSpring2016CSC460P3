@@ -1,50 +1,33 @@
-#include <util/delay.h>
-#include <avr/io.h>
-#include "uart/uart.h"
-#include "adc/adc.h"
-#include "rtos/os.h"
-#include "rtos/kernel.h"
+#include "shared.h"
+#include "remote_declarations.h"
 
-#define NEGATIVE_HIGH			'N'		//reverse in high speed/or turn left high speed
-#define NEGATIVE_LOW			'n'		//reverse in low speed
-#define NOT_MOVING				'z'
-#define POSITIVE_LOW			'p'
-#define POSITIVE_HIGH			'P'
+#define SEMIAUTO						//If uncommented, the robot will always drive forward if joystick is neutral. 
 
-#define FIRE					'F'
-#define HOLD					'H'
+//Global variables used for updating movement information 
+char direction = NOT_MOVING;
+char last_direction = NOT_MOVING;
+char speed = NOT_MOVING;
+char last_speed = NOT_MOVING;
+char fire = HOLD;
 
-//pins
-#define PHOTORESIS_PIN   0		//photosensor pin on A0
-
-#define SENSORS_TO_QUERY 2		//How many sensors are we querying from the robot?
-#define TWO_BYTE_SENSORS 0		//How many of the sensors above returns 2 bytes of data instead of 1?
-
-//Special case values for radius, used for drive
-#define DRIVE_STRAIGHT			0x7FFF			//32767
-#define CLOCKWISE_TURN			0xFFFF			//-1
-#define COUNTER_CLOCKWISE_TURN	0x1				//1
-
-
-#define MAX_CMD_LENG 4
-
-//Command/OPcodes base station sends to remote
-#define MOVE_CMD ((const char *) "!MV\n")
-#define LASER_CMD ((const char *) "!TL\n")
-#define HIT_CMD ((const char *) "!HT\n")
-
-//Command/OPcodes remote station sends to base
-#define SENSOR_DATA ((const char *) "!SD\n")
-
-// gloable variable
-volatile char direction = NOT_MOVING;
-volatile char last_direction = NOT_MOVING;
-volatile char speed = NOT_MOVING;
-volatile char last_speed = NOT_MOVING;
-volatile char fire = HOLD;
+//Global variables used for photoresistors and storing dead state
 uint16_t photores_thres;
-volatile uint16_t photores_neutral;
-volatile uint8_t isDead = 0;
+uint16_t photores_neutral;
+uint8_t isDead = 0;
+
+void calibratePhotores()
+{
+	int i;
+
+	//Sample the ambient lighting 10 times
+	for(i=0; i<10; i++)
+	{
+		photores_neutral += readadc(PHOTORESIS_PIN);
+		_delay_ms(100);
+	}
+	photores_neutral /= i;     //Use the average as neutral value
+	photores_thres = 1.4*photores_neutral;
+}
 
 void switch_uart_19200()
 {
@@ -81,20 +64,6 @@ void beep()
 	uart1_sendbyte(0);
 }
 
-void calibratePhotores()
-{
-	int i;
-
-	//Sample the ambient lighting 10 times
-	for(i=0; i<10; i++)
-	{
-		photores_neutral += readadc(PHOTORESIS_PIN);
-		_delay_ms(100);
-	}
-	photores_neutral /= i;     //Use the average as neutral value
-	photores_thres = 1.4*photores_neutral;
-}
-
 void roomba_init()
 {
 	//Default values
@@ -103,7 +72,6 @@ void roomba_init()
 	
 	switch_uart_19200();
 	start_robot_safe();
-	calibratePhotores();
 	
 	//Write a "song" for the beep into slot 0
 	//Example from: http://www.robotappstore.com/Knowledge-Base/4-How-to-Send-Commands-to-Roomba/18.html
@@ -117,8 +85,6 @@ void roomba_init()
 
 void drive(int16_t vel, int16_t rad)
 {
-	//printf("vel: %d, rad: %d\n", vel, rad);
-	
 	//Making sure velocity is within valid range
 	if(vel < -500) 
 		vel = -500;
@@ -138,71 +104,78 @@ void drive(int16_t vel, int16_t rad)
 	uart1_sendbyte(rad);				//Radius low byte
 }
 
-void move_as_global()
+void movement_controller()
 {
 	int16_t vel;
 	int16_t rad;
+	
 	while (1)
 	{
-		/*if (isDead) {
-			Task_Terminate();
-		}*/
+		//If the base station hasn't issued a new direction or speed, skip updating
 		if (direction == last_direction && speed == last_speed)
 			goto move_as_global_continue;
 		
+		//Decode the direction sent by the base station
 		switch(direction)
 		{
 			case NEGATIVE_HIGH:
-				rad = -1;
+				rad = BACKWARDS_FAST_RAD;
 				break;
 			case NEGATIVE_LOW:
-				rad = 500;
+				rad = BACKWARDS_SLOW_RAD;
 				break;
 			case POSITIVE_LOW:
-				rad = 500;
+				rad = FORWARD_SLOW_RAD;
 				break;
 			case POSITIVE_HIGH:
-				rad = 1;
+				rad = FORWARD_FAST_RAD;
 				break;
 			case NOT_MOVING:
 			default:
-				rad = 0;
+				rad = STAY_STATIONARY;
 				break;
 		}
 	
+		//Decode the speed sent by the base station
 		switch(speed)
 		{
 			case NEGATIVE_HIGH:
-				vel = -500;
+				vel = BACKWARDS_FAST;
 				break;
 			case NEGATIVE_LOW:
-				vel = -250;
+				vel = BACKWARDS_SLOW;
 				break;
 			case POSITIVE_LOW:
-				vel = 250;
+				vel = FORWARD_SLOW;
 				break;
 			case POSITIVE_HIGH:
-				vel = 500;
+				vel = FORWARD_FAST;
 				break;
 			case NOT_MOVING:
 			default:
-				vel = 0;
+				vel = STAY_STATIONARY;
 				break;
 		}
-	
-		if (rad == 1 || rad == -1) {
+		
+		//Special case 1: Give the robot some velocity when making stationary turns
+		if (rad == 1 || rad == -1) 
+		{
 			vel = 250;
-		} else if (rad == 0 && vel == 0) {
+		} 
+		
+		//If robot is in semi-autonomous mode, keep the robot driving instead of stopping
+		#ifdef SEMIAUTO
+		else if (rad == 0 && vel == 0) {
 			vel = 250;
 		}
+		#endif
 	
 		drive(vel, rad);
 
 move_as_global_continue:
 		if (fire == HOLD)
 			PORTB &= ~(1<<PB2);	//pin 51 off
-		else
-		if (fire == FIRE)
+		else if (fire == FIRE)
 			PORTB |= (1<<PB2);	//pin 51 on
 		Task_Sleep(3);
 	}
@@ -211,9 +184,6 @@ move_as_global_continue:
 int isHit()
 {
 	uint16_t val = readadc(PHOTORESIS_PIN); 
-	
-	//uart0_sendstr("PS:\n");
-	//uart0_sendbyte((uint8_t)val);
 	return val > photores_thres;
 }
 
@@ -231,7 +201,7 @@ void handle_sensors()
 		uart1_sendbyte(7);					//Packet 7: Bump/Wheeldrop detection
 		uart1_sendbyte(13);					//Packet 13: Virtual wall seen?
 	
-		Task_Sleep(2);						//End of upper half of handle_sensor
+		Task_Sleep(2);						//End of upper half of handle_sensor and wait for Roomba to reply with sensor data
 		
 		//Check if laser has hit our photosensor
 		if (isHit()) 
@@ -240,31 +210,26 @@ void handle_sensors()
 			drive(0,0);
 			beep();
 			
-			//Write DEAD on the LEDs
+			//Write "DEAD" on the front LEDs
 			uart1_sendbyte(164);
 			uart1_sendbyte(68);
 			uart1_sendbyte(69);
 			uart1_sendbyte(65);
 			uart1_sendbyte(68);
 			
-			//Send the start command to go to passive mode
+			//Send the start command to go to passive mode and act dead
 			uart1_sendbyte(128);	
 			//Task_Terminate();
 		}
 	
-		//Read sensor data returned by the roomba
-		for(i=0; i<SENSORS_TO_QUERY + TWO_BYTE_SENSORS; i++)
-			bytes[i] = uart1_recvbyte();		//Read a byte returned by the robot
-	
 		/*
-			Currently, the data bytes for the following sensors will be returned in order:
-				1: Bump/Wheeldrop
-				2: Virtual wall detection 
-			Note that after robot initialization, the robot will send 8 bytes of unneeded data back to the base station.
-			Be sure to ignore these 8 bytes.
+		Read sensor data returned by the roomba
+		Currently, the data bytes for the following sensors will be returned in order:
+			1: Bump/Wheeldrop
+			2: Virtual wall detection 
 		*/
-	
-		/*BELOW SENSOR ARE INTENDED FOR MANUAL CONTROLS*/
+		for(i=0; i<SENSORS_TO_QUERY + TWO_BYTE_SENSORS; i++)
+			bytes[i] = uart1_recvbyte();
 	
 		//If the left bumper has been hit, back up a bit and then rotate 90 degrees to the right
 		if(bytes[0] == 1)
@@ -287,8 +252,6 @@ void handle_sensors()
 			drive(0,0);
 		}
 		//If the middle has been hit or virtual wall has been detected, back up a bit and then rotate 180 degrees 
-		
-		//else if (bytes[0] == 3)
 		else if (bytes[0] == 3 || bytes[1] == 1)
 		{
 			beep();
@@ -298,7 +261,6 @@ void handle_sensors()
 			_delay_ms(2000);
 			drive(0,0);
 		}
-	
 		Task_Sleep(3);
 	}
 }
@@ -307,25 +269,26 @@ int receive_and_update()
 {
 	uint8_t curbyte;
 	uint8_t count;
+	
 	while(1)
 	{
-		/*if (isDead) {
-			Task_Terminate();
-		}*/
-		
-		curbyte = uart0_recvbyte();
 		count = 0;
-		while (curbyte != '$')
+		curbyte = uart0_recvbyte();
+		
+		while (curbyte != CMD_PREAMBLE)
 		{
-			if (++count > 6)
+			//If more than MAX characters has been received and none is the preamble, skip it.
+			if (++count > MAX_CMD_LENG)
 				goto receive_and_update_continue;
 				
 			curbyte = uart0_recvbyte();
 		}
-	
+		
+		//Save current speed and direction
 		last_direction = direction;
 		last_speed = speed;
-	
+		
+		//When preamble is received, receive the subsequent bytes containing new data for control
 		direction = uart0_recvbyte();
 		speed = uart0_recvbyte();
 		fire = uart0_recvbyte();
@@ -337,17 +300,19 @@ receive_and_update_continue:
 
 void a_main()
 {
-	DDRB |= (1<<PB2);	// pin 51 as ouput	
+	DDRB |= (1<<PB2);	//pin 51 set as output for laser
+	
 	OS_Init();
 	
 	InitADC();
 	uart0_init();		//UART0 is used for BT
 	uart1_init();		//UART1 is used to communicate with the robot
 	roomba_init();
+	calibratePhotores();
 	beep();
 	
 	Task_Create(receive_and_update, 4, 0);
-	Task_Create(move_as_global, 5, 0);
+	Task_Create(movement_controller, 5, 0);
 	Task_Create(handle_sensors, 3, 0);
 	
 	OS_Start();
